@@ -49,6 +49,67 @@ const io = new Server(httpServer, {
   }
 });
 
+// Room interface definition
+interface Room {
+  roomId: string;
+  players: string[];
+  createdAt: Date;
+  status: "waiting";
+  scramble: {
+    corners: number[];
+    cornerOrientation: number[];
+    edges: number[];
+    edgeOrientation: number[];
+  };
+}
+
+// In-memory RoomManager
+class RoomManager {
+  private rooms = new Map<string, Room>();
+
+  createRoom(roomId: string, player1Id: string, player2Id: string): Room {
+    const cube = Cube.random();
+    const room: Room = {
+      roomId,
+      players: [player1Id, player2Id],
+      createdAt: new Date(),
+      status: "waiting",
+      scramble: {
+        corners: [...cube.corners],
+        cornerOrientation: [...cube.cornerOrientation],
+        edges: [...cube.edges],
+        edgeOrientation: [...cube.edgeOrientation],
+      },
+    };
+    this.rooms.set(roomId, room);
+    console.log(`[RoomManager] Room ${roomId} created at ${room.createdAt.toISOString()} with random scramble`);
+    return room;
+  }
+
+  getRoom(roomId: string): Room | undefined {
+    return this.rooms.get(roomId);
+  }
+
+  removeRoom(roomId: string): boolean {
+    const deleted = this.rooms.delete(roomId);
+    if (deleted) {
+      console.log(`[RoomManager] Room ${roomId} removed`);
+    }
+    return deleted;
+  }
+
+  findRoomByPlayer(playerId: string): Room | undefined {
+    for (const room of this.rooms.values()) {
+      if (room.players.includes(playerId)) {
+        return room;
+      }
+    }
+    return undefined;
+  }
+}
+
+const roomManager = new RoomManager();
+
 // Matchmaking queue storing socket IDs
 const matchmakingQueue: string[] = [];
 
@@ -66,14 +127,20 @@ function checkAndMatchPlayers() {
         // Generate a unique room ID
         const roomId = `room-${Math.random().toString(36).substring(2, 11)}`;
 
+        // Register the room in the RoomManager
+        const room = roomManager.createRoom(roomId, player1Id, player2Id);
+
         // Join both sockets to that room
         socket1.join(roomId);
         socket2.join(roomId);
 
         console.log(`Match found! Created room ${roomId} for players ${player1Id} and ${player2Id}`);
 
-        // Emit matchFound to both players containing only the room ID
-        io.to(roomId).emit("matchFound", { roomId });
+        // Emit matchFound to both players containing the room ID and the scramble
+        io.to(roomId).emit("matchFound", {
+          roomId,
+          scramble: room.scramble,
+        });
       } else {
         // Put back any valid socket to the queue if the other disconnected
         if (socket1) {
@@ -125,6 +192,13 @@ io.on("connection", (socket) => {
     if (index !== -1) {
       matchmakingQueue.splice(index, 1);
       console.log(`Player ${socket.id} removed from queue due to disconnect. Queue size: ${matchmakingQueue.length}`);
+    }
+
+    // Clean up room if player was in a room
+    const room = roomManager.findRoomByPlayer(socket.id);
+    if (room) {
+      console.log(`Player ${socket.id} disconnected from room ${room.roomId}. Removing room.`);
+      roomManager.removeRoom(room.roomId);
     }
   });
 });

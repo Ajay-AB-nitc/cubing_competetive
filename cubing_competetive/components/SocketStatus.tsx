@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import { useRouter } from "next/navigation";
 
 const SOCKET_URL = "http://localhost:3001";
 
@@ -11,9 +12,11 @@ export const socket = io(SOCKET_URL, {
 });
 
 export default function SocketStatus() {
+  const router = useRouter();
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [queueStatus, setQueueStatus] = useState<"idle" | "queued">("idle");
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [matchedRoomId, setMatchedRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     function onConnect() {
@@ -24,16 +27,33 @@ export default function SocketStatus() {
       setIsConnected(false);
       setQueueStatus("idle");
       setQueuePosition(null);
+      setMatchedRoomId(null);
     }
 
     function onQueueStatus(data: { status: "idle" | "queued"; position?: number }) {
       setQueueStatus(data.status);
       setQueuePosition(data.position ?? null);
+      if (data.status === "queued") {
+        setMatchedRoomId(null);
+      }
+    }
+
+    function onMatchFound(data: { roomId: string; scramble: any }) {
+      setQueueStatus("idle");
+      setQueuePosition(null);
+      setMatchedRoomId(data.roomId);
+      
+      // Save current match data for /game page to consume
+      sessionStorage.setItem("currentMatch", JSON.stringify(data));
+      
+      // Route to game page
+      router.push("/game");
     }
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("queueStatus", onQueueStatus);
+    socket.on("matchFound", onMatchFound);
 
     // Establish connection if not already connected
     if (!socket.connected) {
@@ -44,11 +64,13 @@ export default function SocketStatus() {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("queueStatus", onQueueStatus);
+      socket.off("matchFound", onMatchFound);
     };
   }, []);
 
   const handleJoinQueue = () => {
     if (isConnected) {
+      setMatchedRoomId(null);
       socket.emit("joinQueue");
     }
   };
@@ -77,9 +99,28 @@ export default function SocketStatus() {
         </div>
       </div>
 
-      {/* Matchmaking Queue Actions */}
+      {/* Matchmaking Queue / Room Info */}
       <div className="flex flex-col gap-2">
-        {queueStatus === "queued" ? (
+        {matchedRoomId ? (
+          <div className="flex flex-col gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-gray-400 font-semibold">Match Status:</span>
+              <span className="text-emerald-400 font-extrabold tracking-wide uppercase">READY</span>
+            </div>
+            <div className="flex flex-col gap-1 mt-1">
+              <span className="text-[10px] uppercase font-bold text-gray-500">Room ID</span>
+              <span className="font-mono text-xs text-white bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/5 truncate select-all" title={matchedRoomId}>
+                {matchedRoomId}
+              </span>
+            </div>
+            <button
+              onClick={handleJoinQueue}
+              className="mt-2 w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-xs rounded-xl transition-all duration-200 cursor-pointer"
+            >
+              Find Another Match
+            </button>
+          </div>
+        ) : queueStatus === "queued" ? (
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center text-xs">
               <span className="text-gray-400 font-semibold">Queue Status:</span>
