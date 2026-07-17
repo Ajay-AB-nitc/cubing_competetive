@@ -52,6 +52,42 @@ const io = new Server(httpServer, {
 // Matchmaking queue storing socket IDs
 const matchmakingQueue: string[] = [];
 
+// Matchmaking helper to pair players
+function checkAndMatchPlayers() {
+  while (matchmakingQueue.length >= 2) {
+    const player1Id = matchmakingQueue.shift();
+    const player2Id = matchmakingQueue.shift();
+
+    if (player1Id && player2Id) {
+      const socket1 = io.sockets.sockets.get(player1Id);
+      const socket2 = io.sockets.sockets.get(player2Id);
+
+      if (socket1 && socket2) {
+        // Generate a unique room ID
+        const roomId = `room-${Math.random().toString(36).substring(2, 11)}`;
+
+        // Join both sockets to that room
+        socket1.join(roomId);
+        socket2.join(roomId);
+
+        console.log(`Match found! Created room ${roomId} for players ${player1Id} and ${player2Id}`);
+
+        // Emit matchFound to both players containing only the room ID
+        io.to(roomId).emit("matchFound", { roomId });
+      } else {
+        // Put back any valid socket to the queue if the other disconnected
+        if (socket1) {
+          matchmakingQueue.unshift(player1Id);
+        }
+        if (socket2) {
+          matchmakingQueue.unshift(player2Id);
+        }
+        break; // Break loop if we couldn't match due to disconnected socket to avoid loops
+      }
+    }
+  }
+}
+
 // Connection handler
 io.on("connection", (socket) => {
   console.log(`Client connected: ${socket.id}`);
@@ -62,6 +98,9 @@ io.on("connection", (socket) => {
       matchmakingQueue.push(socket.id);
       console.log(`Player ${socket.id} joined the queue. Queue size: ${matchmakingQueue.length}`);
       socket.emit("queueStatus", { status: "queued", position: matchmakingQueue.length });
+
+      // Check and match players
+      checkAndMatchPlayers();
     } else {
       console.log(`Player ${socket.id} tried to join but is already in the queue.`);
     }
