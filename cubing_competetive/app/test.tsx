@@ -20,12 +20,42 @@ function formatTime(ms: number): string {
     return `${seconds}.${csStr}`;
 }
 
+interface TimerProps {
+    isRunning: boolean
+    startTime: number
+    elapsedWhenStopped: number
+}
+
+function Timer({ isRunning, startTime, elapsedWhenStopped }: TimerProps) {
+    const [timeElapsed, setTimeElapsed] = useState(0)
+
+    useEffect(() => {
+        if (!isRunning) {
+            setTimeElapsed(elapsedWhenStopped)
+            return
+        }
+
+        const intervalId = setInterval(() => {
+            setTimeElapsed(Date.now() - startTime)
+        }, 10) // 10ms updates for centiseconds
+
+        return () => clearInterval(intervalId)
+    }, [isRunning, startTime, elapsedWhenStopped])
+
+    return (
+        <div className="text-7xl md:text-8xl font-black tabular-nums tracking-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+            {formatTime(timeElapsed)}
+        </div>
+    )
+}
+
 export default function RubiksCube() {
     const [cube, setCube] = useState(() => new Cube())
 
     // Timer states
     const [timerRunning, setTimerRunning] = useState(false)
-    const [timeElapsed, setTimeElapsed] = useState(0)
+    const [startTime, setStartTime] = useState(0)
+    const [elapsedWhenStopped, setElapsedWhenStopped] = useState(0)
     const [isSolved, setIsSolved] = useState(false)
     const [bestTime, setBestTime] = useState<number | null>(null)
 
@@ -49,36 +79,26 @@ export default function RubiksCube() {
             })
     }, [])
 
-    // Timer interval
-    useEffect(() => {
-        let intervalId: any
-        if (timerRunning) {
-            const start = Date.now() - timeElapsed
-            intervalId = setInterval(() => {
-                setTimeElapsed(Date.now() - start)
-            }, 10)
-        }
-        return () => clearInterval(intervalId)
-    }, [timerRunning])
-
     // Solve detection
     useEffect(() => {
         const solved = cube.isSolved()
         setIsSolved(solved)
         if (timerRunning && solved) {
             setTimerRunning(false)
+            const solveTime = Date.now() - startTime
+            setElapsedWhenStopped(solveTime)
             setBestTime(prev => {
-                if (prev === null || timeElapsed < prev) {
-                    return timeElapsed
+                if (prev === null || solveTime < prev) {
+                    return solveTime
                 }
                 return prev
             })
         }
-    }, [cube, timerRunning, timeElapsed])
+    }, [cube, timerRunning, startTime])
 
     const startSolving = () => {
-        setTimeElapsed(0)
         setIsSolved(false)
+        setElapsedWhenStopped(0)
         
         fetch("http://localhost:3001/random")
             .then(res => res.json())
@@ -90,12 +110,14 @@ export default function RubiksCube() {
                         data.edges,
                         data.edgeOrientation
                     ))
+                    setStartTime(Date.now())
                     setTimerRunning(true)
                 }
             })
             .catch(err => {
                 console.error("Error fetching scramble:", err)
                 setCube(Cube.random())
+                setStartTime(Date.now())
                 setTimerRunning(true)
             })
     }
@@ -134,9 +156,11 @@ export default function RubiksCube() {
                     {/* Center Timer */}
                     <div className="flex flex-col items-center justify-center flex-grow pointer-events-auto">
                         <div className="text-center">
-                            <div className="text-7xl md:text-8xl font-black tabular-nums tracking-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
-                                {formatTime(timeElapsed)}
-                            </div>
+                            <Timer
+                                isRunning={timerRunning}
+                                startTime={startTime}
+                                elapsedWhenStopped={elapsedWhenStopped}
+                            />
                             
                             <div className="mt-8 flex gap-4 justify-center">
                                 {!timerRunning ? (
@@ -150,7 +174,7 @@ export default function RubiksCube() {
                                     <button
                                         onClick={() => {
                                             setTimerRunning(false)
-                                            setTimeElapsed(0)
+                                            setElapsedWhenStopped(0)
                                         }}
                                         className="px-8 py-4 bg-rose-500 hover:bg-rose-400 text-white font-extrabold text-lg rounded-2xl border border-rose-400/20 shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer"
                                     >
