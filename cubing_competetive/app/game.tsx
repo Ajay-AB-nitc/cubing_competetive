@@ -7,6 +7,7 @@ import { Cube } from "@/lib/shared";
 import { Cube3D } from "@/components/Cube3D";
 import { useCubeKeyboardControls } from "@/lib/useCubeKeyboardControls";
 import { useRouter } from "next/navigation";
+import { socket } from "@/components/SocketStatus";
 
 // Formats millisecond time
 function formatTime(ms: number): string {
@@ -63,6 +64,10 @@ function GameContent() {
   const [elapsedWhenStopped, setElapsedWhenStopped] = useState(0);
   const [isSolved, setIsSolved] = useState(false);
 
+  // Match start and countdown state
+  const [matchStartTime, setMatchStartTime] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<string | null>(null);
+
   // Load matched game data and apply scramble
   useEffect(() => {
     const matchDataStr = sessionStorage.getItem("currentMatch");
@@ -79,6 +84,9 @@ function GameContent() {
               s.edges,
               s.edgeOrientation
             ));
+
+            // Emit scrambleReady to the server
+            socket.emit("scrambleReady", { roomId: matchData.roomId });
           }
         }
       } catch (e) {
@@ -86,6 +94,40 @@ function GameContent() {
       }
     }
   }, []);
+
+  // Listen for gameStart event from the server
+  useEffect(() => {
+    function onGameStart(data: { startTime: number }) {
+      setMatchStartTime(data.startTime);
+    }
+
+    socket.on("gameStart", onGameStart);
+    return () => {
+      socket.off("gameStart", onGameStart);
+    };
+  }, []);
+
+  // Handle countdown logic
+  useEffect(() => {
+    if (!matchStartTime) return;
+
+    const intervalId = setInterval(() => {
+      const now = Date.now();
+      const diff = matchStartTime - now;
+
+      if (diff <= 0) {
+        clearInterval(intervalId);
+        setCountdown(null);
+        setTimerRunning(true);
+        setStartTime(matchStartTime);
+      } else {
+        // Show remaining seconds with 1 decimal point for visual precision
+        setCountdown((diff / 1000).toFixed(1));
+      }
+    }, 50);
+
+    return () => clearInterval(intervalId);
+  }, [matchStartTime]);
 
   // Solve detection
   useEffect(() => {
@@ -106,6 +148,23 @@ function GameContent() {
       <Cube3D cube={cube} />
 
       <Html fullscreen style={{ pointerEvents: "none" }}>
+        {/* Countdown Overlay */}
+        {countdown !== null && (
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center z-50 pointer-events-auto">
+            <div className="text-center animate-pulse">
+              <div className="text-8xl md:text-9xl font-black text-amber-400 drop-shadow-[0_0_40px_rgba(245,158,11,0.6)] font-mono">
+                {countdown}
+              </div>
+              <div className="text-lg md:text-xl font-bold uppercase tracking-widest text-gray-300 mt-6">
+                Match Starting...
+              </div>
+              <div className="text-xs text-gray-500 mt-2 font-medium">
+                Hands off the keyboard!
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="absolute inset-0 flex flex-col justify-between p-8 text-white font-sans">
           {/* Top Stats */}
           <div className="flex justify-between items-start pointer-events-auto">

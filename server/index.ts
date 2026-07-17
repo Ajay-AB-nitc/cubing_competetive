@@ -61,6 +61,7 @@ interface Room {
     edges: number[];
     edgeOrientation: number[];
   };
+  readyPlayers: string[];
 }
 
 // In-memory RoomManager
@@ -80,6 +81,7 @@ class RoomManager {
         edges: [...cube.edges],
         edgeOrientation: [...cube.edgeOrientation],
       },
+      readyPlayers: [],
     };
     this.rooms.set(roomId, room);
     console.log(`[RoomManager] Room ${roomId} created at ${room.createdAt.toISOString()} with random scramble`);
@@ -180,6 +182,24 @@ io.on("connection", (socket) => {
       matchmakingQueue.splice(index, 1);
       console.log(`Player ${socket.id} left the queue. Queue size: ${matchmakingQueue.length}`);
       socket.emit("queueStatus", { status: "idle" });
+    }
+  });
+
+  // Handle client confirming scramble is applied
+  socket.on("scrambleReady", (data: { roomId: string }) => {
+    console.log(`Player ${socket.id} is ready with scramble in room ${data.roomId}`);
+    const room = roomManager.getRoom(data.roomId);
+    if (room) {
+      if (!room.readyPlayers.includes(socket.id)) {
+        room.readyPlayers.push(socket.id);
+      }
+
+      // Check if both players are ready
+      if (room.readyPlayers.length === 2) {
+        const startTime = Date.now() + 10000;
+        console.log(`Both players ready in room ${room.roomId}. Starting game at ${startTime}`);
+        io.to(room.roomId).emit("gameStart", { startTime });
+      }
     }
   });
 
