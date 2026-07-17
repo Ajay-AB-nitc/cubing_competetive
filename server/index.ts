@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { Cube } from "./shared/cube";
+import type { FaceMove } from "./shared/cubeTypes";
 
 const app = express();
 const port = 3001;
@@ -62,6 +63,8 @@ interface Room {
     edgeOrientation: number[];
   };
   readyPlayers: string[];
+  cubes: Record<string, Cube>;
+  expectedSeq: Record<string, number>;
 }
 
 // In-memory RoomManager
@@ -70,6 +73,22 @@ class RoomManager {
 
   createRoom(roomId: string, player1Id: string, player2Id: string): Room {
     const cube = Cube.random();
+    
+    // Create distinct Cube instances for each player initialized from the same scramble
+    const player1Cube = new Cube(
+      [...cube.corners],
+      [...cube.cornerOrientation],
+      [...cube.edges],
+      [...cube.edgeOrientation]
+    );
+    
+    const player2Cube = new Cube(
+      [...cube.corners],
+      [...cube.cornerOrientation],
+      [...cube.edges],
+      [...cube.edgeOrientation]
+    );
+
     const room: Room = {
       roomId,
       players: [player1Id, player2Id],
@@ -82,6 +101,14 @@ class RoomManager {
         edgeOrientation: [...cube.edgeOrientation],
       },
       readyPlayers: [],
+      cubes: {
+        [player1Id]: player1Cube,
+        [player2Id]: player2Cube,
+      },
+      expectedSeq: {
+        [player1Id]: 0,
+        [player2Id]: 0,
+      },
     };
     this.rooms.set(roomId, room);
     console.log(`[RoomManager] Room ${roomId} created at ${room.createdAt.toISOString()} with random scramble`);
@@ -199,6 +226,53 @@ io.on("connection", (socket) => {
         const startTime = Date.now() + 10000;
         console.log(`Both players ready in room ${room.roomId}. Starting game at ${startTime}`);
         io.to(room.roomId).emit("gameStart", { startTime });
+      }
+    }
+  });
+
+  // Handle client sending a move
+  socket.on("move", (data: { roomId: string; move: string; seq: number }) => {
+    const room = roomManager.getRoom(data.roomId);
+    if (!room) {
+      console.warn(`[Move] Room ${data.roomId} not found for move ${data.move}`);
+      return;
+    }
+
+    const expected = room.expectedSeq[socket.id];
+    if (expected === undefined) {
+      console.warn(`[Move] Player ${socket.id} not found in room ${data.roomId}`);
+      return;
+    }
+
+    if (data.seq !== expected) {
+      console.warn(`[Move] Invalid sequence for Player ${socket.id} in Room ${data.roomId}. Expected ${expected}, got ${data.seq}`);
+      return;
+    }
+
+    const playerCube = room.cubes[socket.id];
+    if (playerCube) {
+      const isReverse = data.move.endsWith("'");
+      const physicalMove = (isReverse ? data.move.slice(0, -1) : data.move) as FaceMove;
+
+      const VALID_FACES = ["U", "D", "R", "L", "F", "B"];
+      if (VALID_FACES.includes(physicalMove)) {
+        if (isReverse) {
+          playerCube.applyMove(physicalMove);
+          playerCube.applyMove(physicalMove);
+          playerCube.applyMove(physicalMove);
+        } else {
+          playerCube.applyMove(physicalMove);
+        }
+        room.expectedSeq[socket.id] = expected + 1;
+        console.log(`[Move] Applied move ${data.move} for Player ${socket.id} in room ${data.roomId} (expected seq: ${room.expectedSeq[socket.id]}, solved: ${playerCube.isSolved()})`);
+        
+        // Broadcast the move to the opponent
+        const opponentId = room.players.find((id) => id !== socket.id);
+        if (opponentId) {
+          io.to(opponentId).emit("opponentMove", { move: data.move });
+        }
+      } else {
+        console.warn(`[Move] Invalid FaceMove parsed: ${physicalMove}`);
       }
     }
   });

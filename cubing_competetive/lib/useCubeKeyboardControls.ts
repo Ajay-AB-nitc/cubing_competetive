@@ -14,7 +14,8 @@ const MOVE_KEYS: Record<string, FaceMove> = {
 
 export function useCubeKeyboardControls(
     setCube: React.Dispatch<React.SetStateAction<Cube>>,
-    enabled: boolean = true
+    enabled: boolean = true,
+    onMove?: (moveStr: string) => void
 ) {
     const { camera } = useThree();
 
@@ -40,6 +41,8 @@ export function useCubeKeyboardControls(
                 const { facingFront, facingTop } = getFacingDirections(camera);
                 const physicalMove = translateMove(relativeMove, facingFront, facingTop);
 
+                const moveStr = isReverse ? `${physicalMove}'` : physicalMove;
+
                 setCube((prev) => {
                     const next = prev.clone();
                     if (isReverse) {
@@ -51,6 +54,10 @@ export function useCubeKeyboardControls(
                     }
                     return next;
                 });
+
+                if (onMove) {
+                    onMove(moveStr);
+                }
             }
         };
 
@@ -58,6 +65,6 @@ export function useCubeKeyboardControls(
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [setCube, camera, enabled]);
+    }, [setCube, camera, enabled, onMove]);
 }
 

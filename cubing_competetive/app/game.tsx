@@ -2,7 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Cube } from "@/lib/shared";
 import { Cube3D } from "@/components/Cube3D";
 import { useCubeKeyboardControls } from "@/lib/useCubeKeyboardControls";
@@ -57,6 +57,9 @@ function GameContent() {
   const router = useRouter();
   const [cube, setCube] = useState(() => new Cube());
   const [roomId, setRoomId] = useState<string | null>(null);
+
+  // Sequence number for moves starting at 0
+  const moveSeqRef = useRef(0);
 
   // Timer states (not running initially)
   const [timerRunning, setTimerRunning] = useState(false);
@@ -140,8 +143,21 @@ function GameContent() {
     }
   }, [cube, timerRunning, startTime]);
 
+  // Emit cube moves to the server with sequence number
+  const handleMove = (moveStr: string) => {
+    if (roomId) {
+      const seq = moveSeqRef.current++;
+      console.log(`[Move] Emitting move: ${moveStr}, seq: ${seq}`);
+      socket.emit("move", {
+        roomId,
+        move: moveStr,
+        seq,
+      });
+    }
+  };
+
   // Bind keyboard controls
-  useCubeKeyboardControls(setCube, timerRunning);
+  useCubeKeyboardControls(setCube, timerRunning, handleMove);
 
   return (
     <>
