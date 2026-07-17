@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { FaceMove } from "@/lib/cubeTypes";
+import { FaceMove } from "@/lib/shared";
 
 export type Face = "U" | "D" | "R" | "L" | "F" | "B";
 

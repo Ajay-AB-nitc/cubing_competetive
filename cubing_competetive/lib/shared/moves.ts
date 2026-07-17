@@ -1,9 +1,9 @@
 import {
   Corner,
   Edge,
-  MoveDefinition,
-  FaceMove,
-} from "@/lib/cubeTypes";
+  type MoveDefinition,
+  type FaceMove,
+} from "./cubeTypes";
 
 export const MOVES: Record<FaceMove, MoveDefinition> = {
   U: {

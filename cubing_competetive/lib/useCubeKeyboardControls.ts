@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useThree } from "@react-three/fiber";
-import { Cube } from "@/lib/cube";
-import { FaceMove } from "@/lib/cubeTypes";
+import { Cube, FaceMove } from "@/lib/shared";
 import { getFacingDirections, translateMove } from "@/lib/moveTranslator";
 
 const MOVE_KEYS: Record<string, FaceMove> = {
@@ -14,12 +13,15 @@ const MOVE_KEYS: Record<string, FaceMove> = {
 };
 
 export function useCubeKeyboardControls(
-    setCube: React.Dispatch<React.SetStateAction<Cube>>
+    setCube: React.Dispatch<React.SetStateAction<Cube>>,
+    enabled: boolean = true
 ) {
     const { camera } = useThree();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (!enabled) return;
+
             // Ignore key presses if typing in input fields
             if (
                 document.activeElement?.tagName === "INPUT" ||
@@ -56,6 +58,6 @@ export function useCubeKeyboardControls(
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [setCube, camera]);
+    }, [setCube, camera, enabled]);
 }
 
