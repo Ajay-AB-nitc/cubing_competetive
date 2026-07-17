@@ -5,6 +5,7 @@ import { OrbitControls, Html } from "@react-three/drei";
 import { useState, useEffect, useRef } from "react";
 import { Cube } from "@/lib/shared";
 import { Cube3D } from "@/components/Cube3D";
+import { MiniCube } from "@/components/MiniCube";
 import { useCubeKeyboardControls } from "@/lib/useCubeKeyboardControls";
 import { useRouter } from "next/navigation";
 import { socket } from "@/components/SocketStatus";
@@ -56,6 +57,7 @@ function Timer({ isRunning, startTime, elapsedWhenStopped }: TimerProps) {
 function GameContent() {
   const router = useRouter();
   const [cube, setCube] = useState(() => new Cube());
+  const [opponentCube, setOpponentCube] = useState(() => new Cube());
   const [roomId, setRoomId] = useState<string | null>(null);
 
   // Sequence number for moves starting at 0
@@ -81,12 +83,21 @@ function GameContent() {
           setRoomId(matchData.roomId);
           if (matchData.scramble) {
             const s = matchData.scramble;
-            setCube(new Cube(
+            const initialCube = new Cube(
               s.corners,
               s.cornerOrientation,
               s.edges,
               s.edgeOrientation
-            ));
+            );
+            setCube(initialCube);
+            
+            const initialOpponentCube = new Cube(
+              s.corners,
+              s.cornerOrientation,
+              s.edges,
+              s.edgeOrientation
+            );
+            setOpponentCube(initialOpponentCube);
 
             // Emit scrambleReady to the server
             socket.emit("scrambleReady", { roomId: matchData.roomId });
@@ -107,6 +118,35 @@ function GameContent() {
     socket.on("gameStart", onGameStart);
     return () => {
       socket.off("gameStart", onGameStart);
+    };
+  }, []);
+
+  // Listen for opponent moves
+  useEffect(() => {
+    function onOpponentMove(data: { move: string }) {
+      console.log("[Opponent Move] Received:", data.move);
+      const isReverse = data.move.endsWith("'");
+      const physicalMove = isReverse ? data.move.slice(0, -1) : data.move;
+
+      const VALID_FACES = ["U", "D", "R", "L", "F", "B"];
+      if (VALID_FACES.includes(physicalMove)) {
+        setOpponentCube((prev) => {
+          const next = prev.clone();
+          if (isReverse) {
+            next.applyMove(physicalMove as any);
+            next.applyMove(physicalMove as any);
+            next.applyMove(physicalMove as any);
+          } else {
+            next.applyMove(physicalMove as any);
+          }
+          return next;
+        });
+      }
+    }
+
+    socket.on("opponentMove", onOpponentMove);
+    return () => {
+      socket.off("opponentMove", onOpponentMove);
     };
   }, []);
 
@@ -228,6 +268,11 @@ function GameContent() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Opponent Mini Cube */}
+          <div className="absolute bottom-8 right-8 z-30 pointer-events-auto shadow-2xl transition-transform duration-200 hover:scale-105">
+            <MiniCube cube={opponentCube} />
           </div>
 
           {/* Bottom Instructions / Keyboard Hints */}
