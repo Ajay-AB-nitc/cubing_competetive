@@ -11,6 +11,10 @@ export const socket = io(SOCKET_URL, {
   autoConnect: false,
 });
 
+if (typeof window !== "undefined") {
+  (window as any).socket = socket;
+}
+
 export default function SocketStatus() {
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(socket.connected);
