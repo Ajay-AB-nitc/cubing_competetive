@@ -73,6 +73,10 @@ function GameContent() {
   const [matchStartTime, setMatchStartTime] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<string | null>(null);
 
+  // Game over/winner states
+  const [winner, setWinner] = useState<string | null>(null);
+  const [finalSolveTime, setFinalSolveTime] = useState<number | null>(null);
+
   // Load matched game data and apply scramble
   useEffect(() => {
     const matchDataStr = sessionStorage.getItem("currentMatch");
@@ -150,6 +154,21 @@ function GameContent() {
     };
   }, []);
 
+  // Listen for gameFinished event from the server
+  useEffect(() => {
+    function onGameFinished(data: { winner: string; solveTime: number }) {
+      setWinner(data.winner);
+      setFinalSolveTime(data.solveTime);
+      setTimerRunning(false);
+      setElapsedWhenStopped(data.solveTime);
+    }
+
+    socket.on("gameFinished", onGameFinished);
+    return () => {
+      socket.off("gameFinished", onGameFinished);
+    };
+  }, []);
+
   // Handle countdown logic
   useEffect(() => {
     if (!matchStartTime) return;
@@ -197,7 +216,7 @@ function GameContent() {
   };
 
   // Bind keyboard controls
-  useCubeKeyboardControls(setCube, timerRunning, handleMove);
+  useCubeKeyboardControls(setCube, timerRunning && !winner, handleMove);
 
   return (
     <>
@@ -221,6 +240,33 @@ function GameContent() {
           </div>
         )}
 
+        {/* Game Finished Overlay */}
+        {winner !== null && (
+          <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center z-50 pointer-events-auto">
+            <div className="text-center max-w-md px-8 py-10 bg-black/40 border border-white/10 rounded-3xl shadow-2xl">
+              <div className={`text-5xl md:text-6xl font-black mb-4 ${
+                winner === socket.id 
+                  ? "text-emerald-400 drop-shadow-[0_0_30px_rgba(16,185,129,0.5)]" 
+                  : "text-rose-500 drop-shadow-[0_0_30px_rgba(244,63,94,0.5)]"
+              }`}>
+                {winner === socket.id ? "YOU WIN! 🎉" : "YOU LOSE 😢"}
+              </div>
+              <p className="text-lg text-gray-300 font-semibold mb-8">
+                Solve time: <span className="text-amber-400 font-bold">{formatTime(finalSolveTime || 0)}</span>
+              </p>
+              <button
+                onClick={() => {
+                  sessionStorage.removeItem("currentMatch");
+                  router.push("/");
+                }}
+                className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-lg rounded-2xl border border-white/10 shadow-2xl transition-all duration-200 transform hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                Back to Lobby
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="absolute inset-0 flex flex-col justify-between p-8 text-white font-sans">
           {/* Top Stats */}
           <div className="flex justify-between items-start pointer-events-auto">
@@ -234,13 +280,25 @@ function GameContent() {
             <div className="bg-black/40 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 shadow-2xl text-right">
               <h2 className="text-xs uppercase tracking-widest text-gray-400 font-bold">Status</h2>
               <p className={`text-sm font-semibold mt-1 ${
-                timerRunning 
-                  ? "text-emerald-400 animate-pulse" 
-                  : isSolved 
-                    ? "text-blue-400" 
-                    : "text-amber-400"
+                winner 
+                  ? winner === socket.id 
+                    ? "text-emerald-400" 
+                    : "text-rose-400"
+                  : timerRunning 
+                    ? "text-emerald-400 animate-pulse" 
+                    : isSolved 
+                      ? "text-blue-400" 
+                      : "text-amber-400"
               }`}>
-                {timerRunning ? "SOLVING" : isSolved ? "SOLVED!" : "READY"}
+                {winner 
+                  ? winner === socket.id 
+                    ? "YOU WON!" 
+                    : "YOU LOST!" 
+                  : timerRunning 
+                    ? "SOLVING" 
+                    : isSolved 
+                      ? "SOLVED!" 
+                      : "READY"}
               </p>
             </div>
           </div>
