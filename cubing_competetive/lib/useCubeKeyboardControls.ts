@@ -32,6 +32,14 @@ export function useCubeKeyboardControls(
                 return;
             }
 
+            if (e.key === "\\") {
+                setCube(Cube.solved());
+                if (onMove) {
+                    onMove("DEBUG_SOLVE");
+                }
+                return;
+            }
+
             const key = e.key.toLowerCase();
             if (key in MOVE_KEYS) {
                 const relativeMove = MOVE_KEYS[key];
