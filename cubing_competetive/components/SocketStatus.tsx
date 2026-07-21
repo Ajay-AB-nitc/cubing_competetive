@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useRouter } from "next/navigation";
 
-const SOCKET_URL = "http://localhost:3001";
+const SOCKET_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 // Create a singleton socket instance for client-side reuse
 export const socket = io(SOCKET_URL, {

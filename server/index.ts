@@ -7,7 +7,7 @@ import { Matchmaker } from "./Matchmaker";
 import { SocketHandlers } from "./SocketHandlers";
 
 const app = express();
-const port = 3001;
+const port = process.env.PORT || 3001;
 
 // CORS Middleware
 app.use((req, res, next) => {

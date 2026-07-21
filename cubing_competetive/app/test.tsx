@@ -61,7 +61,7 @@ export default function RubiksCube() {
 
     // Fetch initial scramble on load
     useEffect(() => {
-        fetch("http://localhost:3001/random")
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/random`)
             .then(res => res.json())
             .then(data => {
                 if (data && Array.isArray(data.corners) && Array.isArray(data.edges)) {
@@ -100,7 +100,7 @@ export default function RubiksCube() {
         setIsSolved(false)
         setElapsedWhenStopped(0)
         
-        fetch("http://localhost:3001/random")
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/random`)
             .then(res => res.json())
             .then(data => {
                 if (data && Array.isArray(data.corners) && Array.isArray(data.edges)) {
