@@ -25,7 +25,7 @@ function GameContent() {
     finalSolveTime,
     matchCancelledReason,
     opponentDisconnected,
-    winnerStats,
+    playerStats,
     rematchRequested,
     opponentRematchRequested,
     opponentLeft,
@@ -99,10 +99,10 @@ function GameContent() {
                   </>
                 )}
               </p>
-              {!opponentDisconnected && winnerStats && (
+              {!opponentDisconnected && playerStats && (
                 <div className="flex justify-center gap-6 text-sm text-gray-400 font-medium mb-8">
-                  <div>Moves: <span className="text-white font-bold">{winnerStats.moveCount}</span></div>
-                  <div>TPS: <span className="text-white font-bold">{winnerStats.tps.toFixed(2)}</span></div>
+                  <div>Moves: <span className="text-white font-bold">{playerStats.moveCount}</span></div>
+                  <div>TPS: <span className="text-white font-bold">{playerStats.tps.toFixed(2)}</span></div>
                 </div>
               )}
               {opponentDisconnected || opponentLeft ? (

@@ -80,7 +80,8 @@ export class SocketHandlers {
           solveTime: result.solveTime ?? 0,
           moveCount: result.moveCount ?? 0,
           tps: result.tps ?? 0,
-          disconnected: false
+          disconnected: false,
+          playerStats: result.playerStats
         });
       }
     });

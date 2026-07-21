@@ -29,7 +29,7 @@ export function useGameLogic() {
   const [finalSolveTime, setFinalSolveTime] = useState<number | null>(null);
   const [matchCancelledReason, setMatchCancelledReason] = useState<string | null>(null);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
-  const [winnerStats, setWinnerStats] = useState<{ moveCount: number; tps: number } | null>(null);
+  const [playerStats, setPlayerStats] = useState<{ moveCount: number; tps: number } | null>(null);
   const [rematchRequested, setRematchRequested] = useState(false);
   const [opponentRematchRequested, setOpponentRematchRequested] = useState(false);
   const [opponentLeft, setOpponentLeft] = useState(false);
@@ -137,14 +137,33 @@ export function useGameLogic() {
 
   // Listen for gameFinished event from the server
   useEffect(() => {
-    function onGameFinished(data: { winner: string; solveTime: number; moveCount?: number; tps?: number; disconnected?: boolean }) {
+    function onGameFinished(data: {
+      winner: string;
+      solveTime: number;
+      moveCount?: number;
+      tps?: number;
+      disconnected?: boolean;
+      playerStats?: Record<string, { solveTime: number; moveCount: number; tps: number }>;
+    }) {
       console.log("[Event: gameFinished] Match finished. Winner:", data.winner, "Data:", data);
       setWinner(data.winner);
-      setFinalSolveTime(data.solveTime);
       setTimerRunning(false);
-      
-      if (data.moveCount !== undefined && data.tps !== undefined) {
-        setWinnerStats({ moveCount: data.moveCount, tps: data.tps });
+
+      let mySolveTime = data.solveTime;
+      let myMoveCount = data.moveCount;
+      let myTps = data.tps;
+
+      if (data.playerStats && socket.id && data.playerStats[socket.id]) {
+        const myData = data.playerStats[socket.id];
+        mySolveTime = myData.solveTime;
+        myMoveCount = myData.moveCount;
+        myTps = myData.tps;
+      }
+
+      setFinalSolveTime(mySolveTime);
+
+      if (myMoveCount !== undefined && myTps !== undefined) {
+        setPlayerStats({ moveCount: myMoveCount, tps: myTps });
       }
 
       // If the player won by opponent disconnection/forfeit, freeze the clock at their current solve time.
@@ -158,7 +177,7 @@ export function useGameLogic() {
           return prev;
         });
       } else {
-        setElapsedWhenStopped(data.solveTime);
+        setElapsedWhenStopped(mySolveTime);
       }
     }
 
@@ -193,7 +212,7 @@ export function useGameLogic() {
       setElapsedWhenStopped(0);
       setIsSolved(false);
       setOpponentDisconnected(false);
-      setWinnerStats(null);
+      setPlayerStats(null);
       setRematchRequested(false);
       setOpponentRematchRequested(false);
       setOpponentLeft(false);
@@ -328,7 +347,8 @@ export function useGameLogic() {
     finalSolveTime,
     matchCancelledReason,
     opponentDisconnected,
-    winnerStats,
+    playerStats,
+    winnerStats: playerStats,
     rematchRequested,
     opponentRematchRequested,
     opponentLeft,

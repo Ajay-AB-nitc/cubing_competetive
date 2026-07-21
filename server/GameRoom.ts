@@ -49,6 +49,22 @@ export class GameRoom {
     }
   }
 
+  getFinalStats(endTime: number = Date.now()): Record<string, { solveTime: number; moveCount: number; tps: number }> {
+    const stats: Record<string, { solveTime: number; moveCount: number; tps: number }> = {};
+    for (const [pid, pState] of this.playerStates.entries()) {
+      const pEndTime = pState.stats.endTime || endTime;
+      const pStartTime = pState.stats.startTime || this.gameStartTime || endTime;
+      const solveTime = Math.max(0, pEndTime - pStartTime);
+      const tps = solveTime > 0 ? (pState.stats.moveCount / (solveTime / 1000)) : 0;
+      stats[pid] = {
+        solveTime,
+        moveCount: pState.stats.moveCount,
+        tps
+      };
+    }
+    return stats;
+  }
+
   applyMove(playerId: string, move: string, seq: number): {
     success: boolean;
     isSolved?: boolean | undefined;
@@ -57,6 +73,7 @@ export class GameRoom {
     solveTime?: number | undefined;
     error?: string | undefined;
     isOldMove?: boolean | undefined;
+    playerStats?: Record<string, { solveTime: number; moveCount: number; tps: number }> | undefined;
   } {
     if (this.status === "finished") {
       return { success: false, error: "Room already finished" };
@@ -88,16 +105,17 @@ export class GameRoom {
       this.status = "finished";
       const endTime = Date.now();
       state.stats.endTime = endTime;
-      const startTime = state.stats.startTime || this.gameStartTime || Date.now();
-      const solveTime = endTime - startTime;
-      const tps = solveTime > 0 ? (state.stats.moveCount / (solveTime / 1000)) : 0;
+
+      const playerStats = this.getFinalStats(endTime);
+      const winnerStats = playerStats[playerId];
 
       return {
         success: true,
         isSolved: true,
-        moveCount: state.stats.moveCount,
-        tps,
-        solveTime
+        moveCount: winnerStats?.moveCount ?? state.stats.moveCount,
+        tps: winnerStats?.tps ?? 0,
+        solveTime: winnerStats?.solveTime ?? 0,
+        playerStats
       };
     }
 
@@ -125,16 +143,17 @@ export class GameRoom {
       this.status = "finished";
       const endTime = Date.now();
       state.stats.endTime = endTime;
-      const startTime = state.stats.startTime || this.gameStartTime || Date.now();
-      const solveTime = endTime - startTime;
-      const tps = solveTime > 0 ? (state.stats.moveCount / (solveTime / 1000)) : 0;
+
+      const playerStats = this.getFinalStats(endTime);
+      const winnerStats = playerStats[playerId];
 
       return {
         success: true,
         isSolved: true,
-        moveCount: state.stats.moveCount,
-        tps,
-        solveTime
+        moveCount: winnerStats?.moveCount ?? state.stats.moveCount,
+        tps: winnerStats?.tps ?? 0,
+        solveTime: winnerStats?.solveTime ?? 0,
+        playerStats
       };
     }
 
