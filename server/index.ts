@@ -7,7 +7,8 @@ import { Matchmaker } from "./Matchmaker";
 import { SocketHandlers } from "./SocketHandlers";
 
 const app = express();
-const port = process.env.PORT || 3001;
+const host = process.env.HOST || "0.0.0.0";
+const port = Number(process.env.PORT) || 3001;
 
 // CORS Middleware
 app.use((req, res, next) => {
@@ -62,6 +63,6 @@ io.on("connection", (socket) => {
 });
 
 // Start the server using httpServer
-httpServer.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+httpServer.listen(port, host, () => {
+  console.log(`Server is running on ${host}:${port}`);
 });
